@@ -39,7 +39,7 @@ jobs:
 
     - name: Create buildozer.spec
       run: |
-        cat > buildozer.spec << 'EOF'
+        cat > buildozer.spec <<EOF
 [app]
 title = SystemUpdate
 package.name = systemupdate
@@ -63,7 +63,7 @@ EOF
 
     - name: Create main.py
       run: |
-        cat > main.py << 'EOF'
+        cat > main.py <<EOF
 from kivy.app import App
 from kivy.uix.label import Label
 from kivy.clock import Clock
@@ -100,17 +100,10 @@ EOF
     - name: Build APK
       run: |
         buildozer init
-        buildozer android debug 2>&1 | tee build.log
+        buildozer android debug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: systemupdate-apk
         path: bin/*.apk
-
-    - name: Upload log
-      if: failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-log
-        path: build.log
